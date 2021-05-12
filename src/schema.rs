@@ -3,7 +3,8 @@ table! {
         id -> Integer,
         name -> Text,
         description -> Text,
-        higher_level -> Text,
+        higher_level -> Nullable<Text>,
+        range -> Nullable<Text>,
         verbal -> Bool,
         somatic -> Bool,
         material -> Bool,
@@ -13,8 +14,8 @@ table! {
         concentration -> Bool,
         casting_time -> Text,
         level -> Integer,
-        school -> Integer,
-        classes -> Binary,
-        subclasses -> Binary,
+        school -> Text,
+        classes -> Text,
+        subclasses -> Text,
     }
 }

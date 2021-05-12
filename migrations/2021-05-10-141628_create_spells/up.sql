@@ -3,6 +3,7 @@ create table spells (
     name varchar(32) not null,
     description text not null,
     higher_level text,
+    range text,
     verbal boolean not null,
     somatic boolean not null,
     material boolean not null,
@@ -12,7 +13,7 @@ create table spells (
     concentration boolean not null,
     casting_time varchar(32) not null,
     level int not null,
-    school int not null,
-    classes blob not null,
-    subclasses blob not null
+    school varchar(32) not null,
+    classes text not null,
+    subclasses text not null
 );

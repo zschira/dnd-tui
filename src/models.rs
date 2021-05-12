@@ -39,6 +39,7 @@ impl TryFrom<String> for Damage {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum School {
     Abjuration = 0,
     Conjuration = 1,
@@ -68,6 +69,22 @@ impl TryFrom<String> for School {
     }
 }
 
+impl Into<String> for School {
+    fn into(self) -> String {
+        match self {
+            School::Abjuration => String::from("abjuration"),
+            School::Conjuration => String::from("conjuration"),
+            School::Divination => String::from("divination"),
+            School::Enchantment => String::from("enchantment"),
+            School::Evocation => String::from("evocatoin"),
+            School::Illusion => String::from("illusion"),
+            School::Necromancy => String::from("necromancy"),
+            School::Transmutation => String::from("transmutation"),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum Class {
     Barbarian = 0,
     Bard = 1,
@@ -101,6 +118,25 @@ impl TryFrom<String> for Class {
             "warlock" => Ok(Class::Warlock),
             "wizard" => Ok(Class::Wizard),
             _ => Err(format!("Invalid class {}", class)),
+        }
+    }
+}
+
+impl Into<String> for Class {
+    fn into(self) -> String {
+        match self {
+            Class::Barbarian => String::from("barbarian"),
+            Class::Bard => String::from("bard"),
+            Class::Cleric => String::from("cleric"),
+            Class::Druid => String::from("druid"),
+            Class::Fighter => String::from("fighter"),
+            Class::Monk => String::from("monk"),
+            Class::Paladin => String::from("paladin"),
+            Class::Ranger => String::from("ranger"),
+            Class::Rogue => String::from("rogue"),
+            Class::Sorcerer => String::from("sorcerer"),
+            Class::Warlock => String::from("warlock"),
+            Class::Wizard => String::from("wizard"),
         }
     }
 }

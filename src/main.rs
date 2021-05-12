@@ -11,30 +11,31 @@ mod db_utils;
 mod models;
 mod schema;
 mod app;
+mod components;
+mod components_ui;
 
 use events::{Config, Event, Events};
-use db_utils::{establish_connection, build_db};
+use app::{App, Component};
 
 fn main() -> Result<(), Box<dyn Error>> {
+    use log::LevelFilter;
+
+    simple_logging::log_to_file("dnd-tui.log", LevelFilter::Info);
     let events = Events::with_config(Config {
         tick_rate: Duration::from_millis(200),
         ..Config::default()
     });
 
-    /*let stdout = io::stdout().into_raw_mode()?;
+    let stdout = io::stdout().into_raw_mode()?;
     let stdout = MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    */
 
-    let conn = establish_connection();
-    build_db(&conn);
 
-    /*
-    let mut app = App::new("DND tui", true);
+    let mut app = App::new("DND tui");
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app))?;
+        terminal.draw(|f| app.component_tree.draw(f, f.size(), &app.search_results))?;
 
         match events.next()? {
             Event::Input(key) => match key {
@@ -53,16 +54,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Key::Right => {
                     app.on_right();
                 }
+                Key::Esc => {
+                    app.on_unselect();
+                }
                 _ => {}
             },
-            Event::Tick => {
-                app.on_tick();
-            }
+            _ => {}
         }
         if app.should_quit {
             break;
         }
-    }*/
+    }
 
     Ok(())
 }
