@@ -1,12 +1,13 @@
-use crate::app::{MoveResponse, SelectResponse, Stateful, StatefulComponent};
-use crate::db_utils::Spell;
-use crate::models::{Class, School};
+use crate::app::{MoveResponse, Stateful, StatefulComponent};
+use crate::input_buffer::InputBuffer;
+use crate::select_events::SelectResponse;
 use tui::layout::Direction;
 use tui::widgets::ListState;
 use tui::backend::Backend;
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use log::info;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Container<C: Default, B: Backend> {
     pub children: Vec<Box<dyn StatefulComponent<B>>>,
@@ -16,7 +17,7 @@ pub struct Container<C: Default, B: Backend> {
 }
 
 impl<C: Default, B: Backend> Container<C, B> {
-    pub fn with_items(items: Vec<Box<dyn StatefulComponent<B>>>, direction: Direction) 
+    pub fn with_items(items: Vec<Box<dyn StatefulComponent<B>>>, direction: Direction)
     -> Container<C, B> {
         Container {
             children: items,
@@ -172,22 +173,9 @@ where
                 SelectState::Selected => {
                     self.selected = SelectState::Highlighted;
                     if let Some(i) = self.state.selected() {
-                        match self.name {
-                            "Class" => {
-                                SelectResponse::Class(
-                                    Class::try_from(
-                                        Into::<String>::into(self.items[i].clone()).to_lowercase()
-                                    ).expect("Invalid class")
-                                )
-                            },
-                            "School" => {
-                                SelectResponse::School(
-                                    School::try_from(
-                                        Into::<String>::into(self.items[i].clone()).to_lowercase()
-                                    ).expect("Invalid school")
-                                )
-                            },
-                            _ => SelectResponse::None,
+                        SelectResponse::Filter{
+                            name: self.name.to_string(),
+                            value: Into::<String>::into(self.items[i].clone()).to_lowercase()
                         }
                     } else {
                         SelectResponse::None
@@ -205,25 +193,25 @@ where
     }
 }
 
-pub struct SearchResults {
+pub struct SearchResults< T> {
     pub state: ListState,
-    pub items: Vec<Spell>,
+    pub items: Rc<RefCell<Vec<T>>>,
     pub selected: SelectState,
-    pub spell_card: bool,
+    pub item_view: bool,
 }
 
-impl SearchResults {
-    pub fn with_items(items: Vec<Spell>) -> SearchResults {
+impl<T> SearchResults<T> {
+    pub fn new(items: Rc<RefCell<Vec<T>>>) -> SearchResults<T> {
         SearchResults {
             state: ListState::default(),
             items,
             selected: SelectState::None,
-            spell_card: false,
+            item_view: false,
         }
     }
 }
 
-impl<'a> Stateful for SearchResults {
+impl<T> Stateful for SearchResults<T> {
     fn next(&mut self, direction: Direction) -> MoveResponse {
         match self.selected {
             SelectState::Selected => {
@@ -232,7 +220,7 @@ impl<'a> Stateful for SearchResults {
                     Direction::Vertical => {
                         let i = match self.state.selected() {
                             Some(i) => {
-                                if i >= self.items.len() - 1 {
+                                if i >= self.items.borrow().len() - 1 {
                                     0
                                 } else {
                                     i + 1
@@ -258,7 +246,7 @@ impl<'a> Stateful for SearchResults {
                         let i = match self.state.selected() {
                             Some(i) => {
                                 if i <= 0 {
-                                    self.items.len() - 1
+                                    self.items.borrow().len() - 1
                                 } else {
                                     i - 1
                                 }
@@ -286,14 +274,14 @@ impl<'a> Stateful for SearchResults {
         if activate {
             match self.selected {
                 SelectState::Selected => {
-                    self.spell_card = true;
+                    self.item_view = true;
                 },
                 _ => {
                     self.selected = SelectState::Selected;
                 },
             }
         } else {
-            self.spell_card = false;
+            self.item_view = false;
             self.selected = SelectState::None;
         }
 
@@ -303,15 +291,15 @@ impl<'a> Stateful for SearchResults {
 
 pub struct SearchBar<'a> {
     pub name: &'a str,
-    pub value: String,
+    pub value: Rc<RefCell<InputBuffer>>,
     pub selected: SelectState,
 }
 
 impl<'a> SearchBar<'a> {
-    pub fn new(name: &'a str) -> SearchBar<'a> {
+    pub fn new(name: &'a str, value: Rc<RefCell<InputBuffer>>) -> SearchBar<'a> {
         SearchBar {
             name,
-            value: String::new(),
+            value,
             selected: SelectState::None,
         }
     }
@@ -361,7 +349,7 @@ impl<'a> Level<'a> {
         Level {
             name,
             level: 0,
-            selected: SelectState::None,
+            selected: SelectState::None
         }
     }
 }
@@ -400,7 +388,10 @@ impl<'a> Stateful for Level<'a> {
             match self.selected {
                 SelectState::Selected => {
                     self.selected = SelectState::None;
-                    SelectResponse::Level(self.level)
+                    SelectResponse::Number {
+                        name: self.name.to_string(),
+                        value: self.level
+                    }
                 },
                 _ => {
                     self.selected = SelectState::Selected;

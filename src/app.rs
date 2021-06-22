@@ -1,12 +1,14 @@
-use diesel::sqlite::SqliteConnection;
 use tui::layout::{Rect, Direction};
 use tui::backend::Backend;
 use tui::Frame;
+use termion::event::Key;
+use std::rc::Rc;
 
-use crate::db_utils::{build_db, establish_connection, query_spell, Query, Spell};
-use crate::components::Container;
-use crate::components_ui::{build_component_tree, SpellSearch};
-use crate::models::{Class, School};
+use crate::db_utils::{build_db, establish_connection};
+use crate::spell_search::{build_component_tree, SpellSearch};
+use crate::select_events::SelectResponse;
+use crate::input_buffer::InputBuffer;
+use ejdb::Database;
 use log::info;
 
 pub enum MoveResponse {
@@ -14,11 +16,9 @@ pub enum MoveResponse {
     None,
 }
 
-pub enum SelectResponse {
-    Level(i32),
-    Class(Class),
-    School(School),
-    None,
+pub enum AppMode {
+    Search,
+    Navigation,
 }
 
 pub trait Stateful {
@@ -29,7 +29,7 @@ pub trait Stateful {
 }
 
 pub trait Component<B: Backend> {
-    fn draw(&mut self, f: &mut Frame<B>, area: Rect, spells: &Option<Vec<Spell>>);
+    fn draw(&self, f: &mut Frame<B>, area: Rect);
 }
 
 pub trait StatefulComponent<B: Backend>: Stateful + Component<B>
@@ -37,22 +37,24 @@ pub trait StatefulComponent<B: Backend>: Stateful + Component<B>
 
 pub struct App<'a, B: Backend> {
     pub title: &'a str,
-    pub component_tree: Container<SpellSearch, B>,
-    pub search_results: Option<Vec<Spell>>,
+    pub component_tree: SpellSearch<B>,
     pub should_quit: bool,
-    pub spell_query: Query,
-    pub conn: SqliteConnection
+    pub db: Rc<Database>,
+    pub search_buf: InputBuffer,
+    pub app_mode: AppMode,
 }
 
 impl<'a, B: 'static + Backend> App<'a, B> {
     pub fn new(title: &'a str) -> App<'a, B> {
+        let db = Rc::new(establish_connection());
+        let component_tree = build_component_tree(Rc::clone(&db));
         let mut app = App {
             title,
-            search_results: None,
-            component_tree: build_component_tree(),
+            component_tree,
             should_quit: false,
-            spell_query: Query::default(),
-            conn: establish_connection()
+            db,
+            search_buf: InputBuffer::new(),
+            app_mode: AppMode::Navigation,
         };
         app.component_tree.hover(true);
         app
@@ -78,38 +80,29 @@ impl<'a, B: 'static + Backend> App<'a, B> {
         self.component_tree.select(false);
     }
 
-    pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
-            }
-            '\n' => {
-                match self.component_tree.select(true) {
-                    SelectResponse::Class(class) => {
-                        self.spell_query.class = Some(class);
-                        self.search_results = 
-                            Some(query_spell(&self.spell_query, &self.conn));
-                    },
-                    SelectResponse::Level(level) => {
-                        self.spell_query.level = Some(level);
-                        self.search_results = 
-                            Some(query_spell(&self.spell_query, &self.conn));
-                    },
-                    SelectResponse::School(school) => {
-                        self.spell_query.school = Some(school);
-                        self.search_results = 
-                            Some(query_spell(&self.spell_query, &self.conn));
-                    },
-                    _ => {}
+    pub fn on_select(&mut self) {
+        self.component_tree.select(true);
+    }
+
+    pub fn on_key(&mut self, key: Key) {
+        match self.app_mode {
+            AppMode::Navigation => {
+                match key {
+                    Key::Up | Key::Char('k') => { self.on_up() },
+                    Key::Down | Key::Char('j') => { self.on_down() },
+                    Key::Left | Key::Char('h') => { self.on_left() },
+                    Key::Right | Key::Char('l') => { self.on_right() },
+                    Key::Char('\n') => { self.on_select() },
+                    Key::Esc => { self.on_unselect() },
+                    Key::Char('q') => { self.should_quit = true; },
+                    Key::Char('/') => { self.app_mode = AppMode::Search; },
+                    _ => {},
                 }
             },
-            'x' => {
-                self.spell_query = Query::default();
-                self.search_results = 
-                    Some(query_spell(&self.spell_query, &self.conn));
+            AppMode::Search => {
+                let exit = self.component_tree.key_stroke(key);
+                if exit { self.app_mode = AppMode::Navigation; }
             },
-            'r' => build_db(&self.conn),
-            _ => {}
         }
     }
 }
